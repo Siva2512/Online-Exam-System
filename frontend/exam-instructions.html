@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Exam instructions - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="student" data-title="Exam instructions">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1 id="t">Examination Instructions</h1>
+      <p id="sub">Please read all instructions before proceeding.</p>
+    </div>
+  </div>
+  <div class="grid g2">
+    <section class="card">
+      <div class="card-h"><h2>General Rules & Honor Code</h2></div>
+      <div class="card-b">
+        <ul style="margin:0 0 16px;padding-left:20px;display:grid;gap:10px">
+          <li>The countdown timer starts as soon as you click <b>Start exam</b>.</li>
+          <li>Each question presents <b>four options</b> with exactly one correct answer.</li>
+          <li>You may navigate between questions freely using the question palette.</li>
+          <li>Select an answer to save it immediately. You can modify your choices at any time prior to submission.</li>
+          <li>Mark questions for review to easily re-check them before submitting.</li>
+          <li>When the timer expires, your test will be submitted automatically.</li>
+          <li>Answers are evaluated and scored persistently on the secure server.</li>
+        </ul>
+        <label class="check">
+          <input type="checkbox" id="agree">
+          <span>I confirm that I will complete this test independently without unauthorized materials or external assistance.</span>
+        </label>
+        <a class="btn" id="start" href="#" aria-disabled="true" style="opacity:0.5;pointer-events:none">Start exam</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-h"><h2>Test Specification</h2></div>
+      <div class="card-b">
+        <dl class="tile" style="padding:0;grid-template-columns:auto 1fr" id="dl">
+          <dt>Status</dt><dd>Loading specification...</dd>
+        </dl>
+      </div>
+    </section>
+  </div>
+</div>
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+const examId = new URLSearchParams(location.search).get('id') || 'aws-basics';
+
+async function initInstructions() {
+  try {
+    const res = await API.getExam(examId);
+    const e = res.exam;
+
+    $('#t').textContent = e.title;
+    $('#sub').textContent = `${e.code} • ${e.category}`;
+
+    $('#dl').innerHTML = `
+      <dt>Category</dt><dd><b>${esc(e.category)}</b></dd>
+      <dt>Test Code</dt><dd>${esc(e.code)}</dd>
+      <dt>Duration</dt><dd>${e.duration} minutes</dd>
+      <dt>Total Questions</dt><dd>${e.question_count || e.total_marks || 10}</dd>
+      <dt>Total Marks</dt><dd>${e.total_marks || 10}</dd>
+      <dt>Pass Score</dt><dd>${e.pass_marks || 6} (${pct(e.pass_marks || 6, e.total_marks || 10)}%)</dd>
+      <dt>Evaluation</dt><dd>Automated Server-Side Scoring</dd>
+    `;
+
+    const go = $('#start');
+    $('#agree').onchange = ev => {
+      const checked = ev.target.checked;
+      go.style.opacity = checked ? '1' : '0.5';
+      go.style.pointerEvents = checked ? 'auto' : 'none';
+      go.setAttribute('aria-disabled', !checked);
+      go.href = checked ? `take-exam.html?id=${e.id}` : '#';
+    };
+  } catch (err) {
+    $('#sub').textContent = 'Error loading test specifications: ' + err.message;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initInstructions);
+</script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Create or edit exam - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="admin" data-title="Create exam">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1 id="h">Create Exam</h1>
+      <p>Configure test parameters. Questions can be managed after saving.</p>
+    </div>
+  </div>
+
+  <form id="f" class="card" novalidate>
+    <div class="card-b">
+      <div class="row">
+        <div class="field">
+          <label for="title">Exam title</label>
+          <input id="title" placeholder="e.g. AWS Cloud Practitioner Practice Exam" required>
+          <span class="err"></span>
+        </div>
+        <div class="field">
+          <label for="code">Course code</label>
+          <input id="code" placeholder="e.g. AWS-101" required>
+          <span class="err"></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="category">Category</label>
+        <input id="category" placeholder="e.g. Cloud Computing or Networking" required>
+        <span class="err"></span>
+      </div>
+
+      <div class="field">
+        <label for="desc">Instructions for students</label>
+        <textarea id="desc" rows="3" placeholder="Key instructions or objectives for students before they begin."></textarea>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="dur">Duration (minutes)</label>
+          <input id="dur" type="number" min="1" max="240" value="30" required>
+          <span class="err"></span>
+        </div>
+        <div class="field">
+          <label for="marks">Total marks</label>
+          <input id="marks" type="number" min="1" value="10" required>
+          <span class="err"></span>
+        </div>
+        <div class="field">
+          <label for="pass">Pass marks</label>
+          <input id="pass" type="number" min="0" value="6" required>
+          <span class="err"></span>
+        </div>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" id="show" checked>
+        <span>Show correct answers to students after they submit</span>
+      </label>
+
+      <div class="acts">
+        <button class="btn" id="go" type="submit">Save exam</button>
+        <a class="btn sec" href="admin-exams.html">Cancel</a>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+const examId = new URLSearchParams(location.search).get('id');
+let isEdit = !!examId;
+
+async function initForm() {
+  if (isEdit) {
+    $('#h').textContent = 'Edit Exam';
+    document.title = 'Edit Exam - ExamDesk';
+    try {
+      const res = await API.getExam(examId);
+      const e = res.exam;
+      $('#title').value = e.title;
+      $('#code').value = e.code;
+      $('#category').value = e.category || 'General';
+      $('#desc').value = e.description || '';
+      $('#dur').value = e.duration;
+      $('#marks').value = e.total_marks || e.marks;
+      $('#pass').value = e.pass_marks || e.pass;
+      $('#show').checked = !!e.show_answers;
+    } catch (err) {
+      toast('Failed to load exam details: ' + err.message, 'bad');
+    }
+  }
+}
+
+$('#f').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const v = id => $('#' + id).value.trim();
+  const msg = {};
+
+  if (v('title').length < 3) msg.title = 'Enter a title of at least 3 characters.';
+  if (!v('code')) msg.code = 'Enter a course code.';
+  if (!v('category')) msg.category = 'Enter an exam category.';
+  if (!(+v('dur') >= 1)) msg.dur = 'Enter duration in minutes.';
+  if (!(+v('marks') >= 1)) msg.marks = 'Enter total marks.';
+  if (v('pass') === '' || +v('pass') > +v('marks')) msg.pass = 'Pass marks cannot exceed total marks.';
+
+  ['title', 'code', 'category', 'dur', 'marks', 'pass'].forEach(id => {
+    const f = $('#' + id).closest('.field');
+    f.classList.toggle('invalid', !!msg[id]);
+    $('.err', f).textContent = msg[id] || '';
+  });
+
+  if (Object.keys(msg).length) return;
+
+  const btn = $('#go');
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+
+  const payload = {
+    title: v('title'),
+    code: v('code'),
+    category: v('category'),
+    description: $('#desc').value.trim(),
+    duration: +v('dur'),
+    total_marks: +v('marks'),
+    pass_marks: +v('pass'),
+    show_answers: $('#show').checked,
+    status: 'published'
+  };
+
+  try {
+    if (isEdit) {
+      await API.updateExam(examId, payload);
+      toast('Exam updated successfully.', 'ok');
+    } else {
+      payload.id = v('code').toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now().toString().slice(-4);
+      await API.createExam(payload);
+      toast('Exam created successfully.', 'ok');
+    }
+    setTimeout(() => location.href = 'admin-exams.html', 800);
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = original;
+    toast('Error: ' + err.message, 'bad');
+  }
+});
+
+document.addEventListener('DOMContentLoaded', initForm);
+</script>
+</body>
+</html>

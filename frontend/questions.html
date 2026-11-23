@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Question management - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="admin" data-title="Questions">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1>Question Bank Management</h1>
+      <p>Configure multiple-choice questions with 4 options and answer explanations.</p>
+    </div>
+    <button class="btn" id="add">Add question</button>
+  </div>
+
+  <section class="card">
+    <div class="toolbar">
+      <select id="ex" aria-label="Choose exam"></select>
+    </div>
+    <div id="list">
+      <div class="empty"><span class="spinner"></span> Loading questions...</div>
+    </div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <form id="qf" novalidate>
+    <div class="dlg-b">
+      <h2 id="dT">Add Question</h2><br>
+      <div class="field">
+        <label for="qt">Question text</label>
+        <textarea id="qt" rows="2" placeholder="Enter question prompt..." required></textarea>
+      </div>
+      <p class="lbl">Options (Select the radio button for the correct option)</p><br>
+      <div id="oi"></div>
+      <div class="field" style="margin-top:14px">
+        <label for="qexp">Explanation (Shown to students after submission)</label>
+        <textarea id="qexp" rows="2" placeholder="Explain why the chosen option is correct..."></textarea>
+      </div>
+      <div class="err" id="qe"></div>
+    </div>
+    <div class="dlg-f">
+      <button type="button" class="btn sec" id="no">Cancel</button>
+      <button class="btn" id="saveBtn" type="submit">Save question</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+const L = 'ABCD';
+let currentQuestions = [];
+let editQuestion = null;
+
+async function initQuestionsPage() {
+  try {
+    const res = await API.getAdminExams();
+    const exams = res.exams || [];
+    const sel = $('#ex');
+
+    sel.innerHTML = exams.map(e => `<option value="${e.id}">${esc(e.code)}: ${esc(e.title)}</option>`).join('');
+
+    const pre = new URLSearchParams(location.search).get('id');
+    if (pre && exams.some(e => e.id === pre)) sel.value = pre;
+
+    sel.onchange = loadExamQuestions;
+    loadExamQuestions();
+  } catch (err) {
+    $('#list').innerHTML = `<div class="empty"><b>Error loading exams</b>${esc(err.message)}</div>`;
+  }
+}
+
+async function loadExamQuestions() {
+  const examId = $('#ex').value;
+  if (!examId) return;
+
+  $('#list').innerHTML = '<div class="empty"><span class="spinner"></span> Loading questions...</div>';
+
+  try {
+    const res = await API.getAdminQuestions(examId);
+    currentQuestions = res.questions || [];
+    draw();
+  } catch (err) {
+    $('#list').innerHTML = `<div class="empty"><b>Error loading questions</b>${esc(err.message)}</div>`;
+  }
+}
+
+function draw() {
+  if (!currentQuestions.length) {
+    $('#list').innerHTML = '<div class="empty"><b>No questions yet</b>Click "Add question" to add the first question to this exam.</div>';
+    return;
+  }
+
+  $('#list').innerHTML = currentQuestions.map((q, i) => `
+    <article class="exam-card" style="align-items:flex-start">
+      <div>
+        <h3>${i + 1}. ${esc(q.text)}</h3>
+        <p class="hint" style="margin:8px 0">
+          ${q.opts.map((o, k) => (k === q.a ? '<b style="color:var(--ok)">' : '') + L[k] + '. ' + esc(o) + (k === q.a ? ' &check; (Correct Answer)</b>' : '')).join('<br>')}
+        </p>
+        ${q.explanation ? `<p class="hint" style="font-size:0.85rem"><i>Explanation: ${esc(q.explanation)}</i></p>` : ''}
+      </div>
+      <div class="acts">
+        <button class="btn sm sec" data-a="e" data-id="${q.id}">Edit</button>
+        <button class="btn sm danger" data-a="d" data-id="${q.id}">Delete</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+function openModal(q) {
+  editQuestion = q || null;
+  $('#dT').textContent = q ? 'Edit Question' : 'Add Question';
+  $('#qt').value = q ? q.text : '';
+  $('#qexp').value = q ? (q.explanation || '') : '';
+  $('#qe').textContent = '';
+
+  $('#oi').innerHTML = [0, 1, 2, 3].map(i => `
+    <div class="check" style="align-items:center;margin-bottom:8px">
+      <input type="radio" name="ok" value="${i}" aria-label="Option ${L[i]} is correct" ${q ? (q.a === i ? 'checked' : '') : (i === 0 ? 'checked' : '')}>
+      <input id="o${i}" placeholder="Option ${L[i]}" value="${q && q.opts[i] ? esc(q.opts[i]) : ''}" aria-label="Option ${L[i]} text" required>
+    </div>
+  `).join('');
+
+  $('#dlg').showModal();
+}
+
+$('#add').onclick = () => openModal();
+$('#no').onclick = () => $('#dlg').close();
+
+$('#list').onclick = async ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  const qId = +b.dataset.id;
+  const q = currentQuestions.find(x => x.id === qId);
+  if (!q) return;
+
+  if (b.dataset.a === 'e') {
+    openModal(q);
+  } else if (b.dataset.a === 'd') {
+    if (confirm('Delete this question permanently?')) {
+      try {
+        await API.deleteQuestion(qId);
+        toast('Question deleted.', 'ok');
+        loadExamQuestions();
+      } catch (err) {
+        toast('Error deleting question: ' + err.message, 'bad');
+      }
+    }
+  }
+};
+
+$('#qf').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const opts = [0, 1, 2, 3].map(i => $('#o' + i).value.trim());
+  const text = $('#qt').value.trim();
+  const explanation = $('#qexp').value.trim();
+
+  if (text.length < 5) return $('#qe').textContent = 'Write a clear question prompt.';
+  if (opts.some(o => !o)) return $('#qe').textContent = 'Please fill in all four options.';
+  if (new Set(opts).size < 4) return $('#qe').textContent = 'All four options must be unique.';
+
+  const a = +$('input[name=ok]:checked').value;
+  const examId = $('#ex').value;
+
+  const payload = { text, opts, a, explanation };
+
+  try {
+    if (editQuestion) {
+      await API.updateQuestion(editQuestion.id, payload);
+      toast('Question updated.', 'ok');
+    } else {
+      await API.addQuestion(examId, payload);
+      toast('Question added successfully.', 'ok');
+    }
+    $('#dlg').close();
+    loadExamQuestions();
+  } catch (err) {
+    $('#qe').textContent = 'Save failed: ' + err.message;
+  }
+});
+
+document.addEventListener('DOMContentLoaded', initQuestionsPage);
+</script>
+</body>
+</html>

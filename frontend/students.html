@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Student management - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="admin" data-title="Students">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1>Registered Students</h1>
+      <p>Performance tracking and attempt metrics per student.</p>
+    </div>
+  </div>
+
+  <section class="card">
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="Search by name, register number or email" aria-label="Search students">
+      <select id="d" aria-label="Filter by department">
+        <option value="">All departments</option>
+      </select>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Register no.</th>
+            <th>Department</th>
+            <th>Attempts</th>
+            <th>Average</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7" style="text-align:center"><span class="spinner"></span> Loading students...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" hidden><b>No students found</b>Try a different search or department.</div>
+  </section>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+let students = [];
+
+async function loadStudents() {
+  try {
+    const res = await API.getAdminStudents();
+    students = res.students || [];
+
+    const depts = [...new Set(students.map(s => s.dept).filter(Boolean))];
+    const deptSelect = $('#d');
+    depts.forEach(dept => {
+      const opt = document.createElement('option');
+      opt.value = dept;
+      opt.textContent = dept;
+      deptSelect.appendChild(opt);
+    });
+
+    draw();
+  } catch (err) {
+    console.error('Failed to load students:', err);
+    $('#rows').innerHTML = `<tr><td colspan="7" class="err">Failed to load students: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+function draw() {
+  const q = $('#q').value.toLowerCase().trim();
+  const d = $('#d').value;
+
+  const rows = students.filter(s => {
+    const matchSearch = !q || (s.name + ' ' + (s.id || '') + ' ' + s.email).toLowerCase().includes(q);
+    const matchDept = !d || s.dept === d;
+    return matchSearch && matchDept;
+  });
+
+  $('#rows').innerHTML = rows.map(s => `
+    <tr>
+      <td><b>${esc(s.name)}</b><br><span class="hint">${esc(s.email)}</span></td>
+      <td><b>${esc(s.id)}</b></td>
+      <td>${esc(s.dept || 'General')}</td>
+      <td>${s.attempts}</td>
+      <td>${s.attempts ? s.avg + '%' : '-'}</td>
+      <td>${badge('Active', 'b-ok')}</td>
+      <td><a class="btn sm sec" href="admin-results.html?student=${encodeURIComponent(s.id)}">View attempts</a></td>
+    </tr>
+  `).join('');
+
+  $('#empty').hidden = rows.length > 0;
+}
+
+$('#q').oninput = draw;
+$('#d').onchange = draw;
+document.addEventListener('DOMContentLoaded', loadStudents);
+</script>
+</body>
+</html>

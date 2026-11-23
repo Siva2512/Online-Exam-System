@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Exam management - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="admin" data-title="Exams">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1>Exam Management</h1>
+      <p>Publish an exam to make it visible to students.</p>
+    </div>
+    <a class="btn" href="exam-form.html">Create exam</a>
+  </div>
+
+  <section class="card">
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="Search by title or code" aria-label="Search exams">
+      <select id="st" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        <option value="published">published</option>
+        <option value="draft">draft</option>
+      </select>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Exam</th>
+            <th>Category</th>
+            <th>Duration</th>
+            <th>Marks</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="6" style="text-align:center"><span class="spinner"></span> Loading exams...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" hidden><b>No exams found</b>Try a different search or create a new exam.</div>
+  </section>
+</div>
+
+<dialog id="dlg">
+  <div class="dlg-b">
+    <h2>Delete this exam?</h2>
+    <p class="hint" id="dBody"></p>
+  </div>
+  <div class="dlg-f">
+    <button class="btn sec" id="no">Cancel</button>
+    <button class="btn danger" id="yes">Delete exam</button>
+  </div>
+</dialog>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+let exams = [];
+let target = null;
+
+async function loadExams() {
+  try {
+    const res = await API.getAdminExams();
+    exams = res.exams || [];
+    draw();
+  } catch (err) {
+    console.error('Failed to load admin exams:', err);
+    $('#rows').innerHTML = `<tr><td colspan="6" class="err">Failed to load exams: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+function draw() {
+  const q = $('#q').value.toLowerCase().trim();
+  const st = $('#st').value;
+
+  const rows = exams.filter(e => (!q || (e.title + ' ' + (e.code || '')).toLowerCase().includes(q)) && (!st || e.status === st));
+
+  $('#rows').innerHTML = rows.map(e => `
+    <tr>
+      <td class="wrap">
+        <b>${esc(e.title)}</b><br>
+        <span class="hint">${esc(e.code)}, ${e.question_count !== undefined ? e.question_count : 10} questions</span>
+      </td>
+      <td><span class="badge b-info">${esc(e.category || 'General')}</span></td>
+      <td>${e.duration} min</td>
+      <td>${e.total_marks || e.marks || 10} (pass ${e.pass_marks || e.pass || 6})</td>
+      <td>${e.status === 'published' ? badge('Published', 'b-ok') : badge('Draft', 'b-gray')}</td>
+      <td>
+        <div class="acts">
+          <button class="btn sm sec" data-a="pub" data-id="${e.id}">${e.status === 'published' ? 'Unpublish' : 'Publish'}</button>
+          <a class="btn sm sec" href="questions.html?id=${e.id}">Questions</a>
+          <a class="btn sm sec" href="exam-form.html?id=${e.id}">Edit</a>
+          <button class="btn sm danger" data-a="del" data-id="${e.id}">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  $('#empty').hidden = rows.length > 0;
+}
+
+$('#rows').onclick = async ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  const examId = b.dataset.id;
+  const e = exams.find(x => x.id === examId);
+  if (!e) return;
+
+  if (b.dataset.a === 'pub') {
+    const newStatus = e.status === 'published' ? 'draft' : 'published';
+    try {
+      await API.toggleExamStatus(e.id, newStatus);
+      e.status = newStatus;
+      toast(newStatus === 'published' ? 'Exam published.' : 'Exam unpublished.', 'ok');
+      draw();
+    } catch (err) {
+      toast('Failed to update status: ' + err.message, 'bad');
+    }
+  } else if (b.dataset.a === 'del') {
+    target = e;
+    $('#dBody').textContent = `"${e.title}" and its questions will be permanently removed. Attempts already submitted will remain in records.`;
+    $('#dlg').showModal();
+  }
+};
+
+$('#no').onclick = () => $('#dlg').close();
+$('#yes').onclick = async () => {
+  if (!target) return;
+  try {
+    await API.deleteExam(target.id);
+    exams = exams.filter(x => x.id !== target.id);
+    $('#dlg').close();
+    toast('Exam deleted.', 'ok');
+    draw();
+  } catch (err) {
+    toast('Failed to delete exam: ' + err.message, 'bad');
+  }
+};
+
+$('#q').oninput = draw;
+$('#st').onchange = draw;
+document.addEventListener('DOMContentLoaded', loadExams);
+</script>
+</body>
+</html>

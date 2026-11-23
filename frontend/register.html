@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Create account - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="public" data-title="">
+<div id="page">
+  <div class="auth-wrap">
+    <div class="card auth">
+      <div class="card-b">
+        <h1>Create your student account</h1>
+        <p class="hint">Enter your personal registration details to get started.</p><br>
+        <div id="alert" class="alert bad" role="alert" hidden></div>
+        <form id="f" novalidate>
+          <div class="field">
+            <label for="name">Full name</label>
+            <input id="name" autocomplete="name" placeholder="e.g. John Doe" required>
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="sid">Registration number</label>
+            <input id="sid" placeholder="e.g. REG-2026-101 or 22CS052" required>
+            <span class="hint" style="font-size:0.8rem">Any unique registration identifier for your institution.</span>
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="email">Email address</label>
+            <input id="email" type="email" autocomplete="email" placeholder="student@example.com" required>
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="pw">Password</label>
+            <input id="pw" type="password" autocomplete="new-password" placeholder="At least 6 characters" required>
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="pw2">Confirm password</label>
+            <input id="pw2" type="password" autocomplete="new-password" placeholder="Repeat password" required>
+            <span class="err"></span>
+          </div>
+          <button class="btn block" id="go" type="submit">Create account</button>
+        </form>
+        <p class="center hint" style="margin:16px 0 0">Already registered? <a href="login.html">Log in</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+const rules = {
+  name: v => (v.trim().length >= 2) || 'Enter your full name.',
+  sid: v => (v.trim().length >= 2) || 'Enter your registration number.',
+  email: v => (/^\S+@\S+\.\S+$/.test(v.trim())) || 'Enter a valid email address.',
+  pw: v => (v.length >= 6) || 'Password must be at least 6 characters long.',
+  pw2: v => (v === $('#pw').value) || 'Passwords do not match.'
+};
+
+$('#f').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const alertEl = $('#alert');
+  alertEl.hidden = true;
+
+  let ok = true;
+  for (const [id, rule] of Object.entries(rules)) {
+    const val = $('#' + id).value;
+    const r = rule(val);
+    const f = $('#' + id).closest('.field');
+    f.classList.toggle('invalid', r !== true);
+    $('.err', f).textContent = r === true ? '' : r;
+    if (r !== true) ok = false;
+  }
+  if (!ok) return;
+
+  const btn = $('#go');
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Creating account...';
+
+  try {
+    const name = $('#name').value.trim();
+    const sid = $('#sid').value.trim();
+    const email = $('#email').value.trim().toLowerCase();
+    const pw = $('#pw').value;
+
+    const res = await API.register(name, email, sid, pw);
+    if (res.success) {
+      toast('Account created successfully! Logging you in...', 'ok');
+      setTimeout(() => {
+        location.href = 'student-dashboard.html';
+      }, 500);
+    }
+  } catch (err) {
+    alertEl.hidden = false;
+    alertEl.textContent = err.message || 'Registration failed. Please check your details and try again.';
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
+  }
+});
+</script>
+</body>
+</html>

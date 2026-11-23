@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Live exam - ExamDesk</title><link rel="stylesheet" href="css/app.css"></head>
+<body data-role="exam" data-title="">
+<header class="ex-bar"><span class="brand"><span class="brand-mark">E</span>ExamDesk</span><span class="ex-title" id="exTitle"></span>
+  <div class="timer" id="timer" role="timer" aria-label="Time remaining">--:--</div></header>
+<div class="ex-wrap" id="page">
+  <section class="card">
+    <div class="card-h"><h2 id="qNo"></h2><span class="hint" id="saved" aria-live="polite"></span></div>
+    <div class="card-b"><p class="q-text" id="qText"></p><div id="opts" role="radiogroup" aria-labelledby="qText"></div></div>
+    <div class="ex-actions">
+      <button class="btn sec" id="prev">Previous</button>
+      <button class="btn sec" id="rev">Mark for review</button>
+      <span class="sp"></span>
+      <button class="btn" id="next">Save and next</button>
+    </div>
+  </section>
+  <aside class="card"><div class="card-h"><h3>Question palette</h3></div><div class="card-b">
+    <div class="palette" id="palette"></div>
+    <ul class="legend"><li><i class="a"></i>Answered (<span id="nA">0</span>)</li><li><i></i>Not answered (<span id="nU">0</span>)</li><li><i class="r"></i>Marked for review (<span id="nR">0</span>)</li></ul>
+    <button class="btn block" id="submit">Submit examination</button>
+  </div></aside>
+</div>
+<dialog id="dlg" aria-labelledby="dT"><div class="dlg-b"><h2 id="dT">Submit your exam?</h2><p id="dBody" class="hint"></p></div>
+  <div class="dlg-f"><button class="btn sec" id="back">Keep working</button><button class="btn" id="yes">Submit now</button></div></dialog>
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script src="js/take-exam.js"></script></body></html>

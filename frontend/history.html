@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Exam history - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="student" data-title="Exam history">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1>Personal Examination History</h1>
+      <p>All test submissions recorded persistently for your account.</p>
+    </div>
+    <a class="btn" href="exams.html">Take Another Exam</a>
+  </div>
+
+  <section class="card">
+    <div class="tbl-wrap">
+      <table id="historyTable">
+        <thead>
+          <tr>
+            <th>Exam Title</th>
+            <th>Category</th>
+            <th>Submitted At</th>
+            <th>Time Taken</th>
+            <th>Score</th>
+            <th>Percentage</th>
+            <th>Outcome</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="8" style="text-align:center"><span class="spinner"></span> Loading history...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" hidden>
+      <b>You haven't taken any tests yet.</b>
+      Your completed examination attempts will be recorded and displayed here.
+    </div>
+  </section>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+async function loadHistory() {
+  try {
+    const res = await API.getResults();
+    const attempts = res.results || [];
+
+    if (attempts.length === 0) {
+      $('#historyTable').hidden = true;
+      $('#empty').hidden = false;
+      return;
+    }
+
+    $('#historyTable').hidden = false;
+    $('#empty').hidden = true;
+
+    $('#rows').innerHTML = attempts.map(a => {
+      const outcome = passBadge(a.passed);
+      const category = a.exam_category ? `<span class="badge b-info">${esc(a.exam_category)}</span>` : '<span class="badge b-gray">General</span>';
+      return `<tr>
+        <td><b>${esc(a.exam_title || a.exam_id)}</b><br><small class="hint">${esc(a.exam_code || '')}</small></td>
+        <td>${category}</td>
+        <td>${fmtDateTime(a.submitted_at)}</td>
+        <td>${a.time_taken} min</td>
+        <td><b>${a.score}</b> / ${a.total_marks || a.total_questions}</td>
+        <td>${a.percentage}%</td>
+        <td>${outcome}</td>
+        <td><a class="btn sm sec" href="result.html?id=${a.exam_id}&attempt_id=${a.id}">View Result</a></td>
+      </tr>`;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load history:', err);
+    $('#historyTable').hidden = true;
+    $('#empty').hidden = false;
+    $('#empty').innerHTML = `<b>Unable to load history</b>${esc(err.message)}`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadHistory);
+</script>
+</body>
+</html>

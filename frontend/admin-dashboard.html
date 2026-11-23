@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin dashboard - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="admin" data-title="Dashboard">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1>Administration Dashboard</h1>
+      <p>Real-time metrics and student activity across all exams.</p>
+    </div>
+    <a class="btn" href="exam-form.html">Create exam</a>
+  </div>
+
+  <div class="grid g4 mb" id="stats">
+    <div class="card stat"><b>--</b><span>Registered students</span></div>
+    <div class="card stat"><b>--</b><span>Total exams</span></div>
+    <div class="card stat"><b>--</b><span>Active exams</span></div>
+    <div class="card stat"><b>--</b><span>Overall average</span></div>
+  </div>
+
+  <div class="grid g2">
+    <section class="card">
+      <div class="card-h"><h2>Average score by exam</h2></div>
+      <div class="card-b" id="bars">
+        <span class="hint">Loading metrics...</span>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-h"><h2>Open exams</h2><a href="admin-exams.html">Manage</a></div>
+      <div id="active"><span class="hint">Loading exams...</span></div>
+    </section>
+  </div>
+  <br>
+
+  <section class="card">
+    <div class="card-h"><h2>Latest student attempts</h2><a href="admin-results.html">All results</a></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Exam</th>
+            <th>Submitted</th>
+            <th>Score</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="5" style="text-align:center"><span class="spinner"></span> Loading attempts...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+async function loadAdminDashboard() {
+  try {
+    const res = await API.getAdminDashboard();
+    const data = res.data;
+
+    // Stats
+    $('#stats').innerHTML = [
+      [data.total_students, 'Registered students'],
+      [data.total_exams, 'Total exams'],
+      [data.active_exams, 'Active exams'],
+      [data.total_attempts, 'Completed attempts'],
+      [(data.overall_average || 0) + '%', 'Average score']
+    ].map(([n, l]) => `<div class="card stat"><b>${n}</b><span>${l}</span></div>`).join('');
+
+    // Bars
+    if (data.exam_averages && data.exam_averages.length) {
+      $('#bars').innerHTML = data.exam_averages.map(b => `
+        <div class="bar-row">
+          <span>${esc(b.title)}</span>
+          <div class="progress"><i style="width:${b.avg}%"></i></div>
+          <b>${b.avg}%</b>
+        </div>
+      `).join('');
+    } else {
+      $('#bars').innerHTML = '<div class="empty"><b>No attempts yet</b>Student scores will appear here once exams are taken.</div>';
+    }
+
+    // Active Exams
+    const published = (data.exams || []).filter(e => e.status === 'published');
+    if (published.length) {
+      $('#active').innerHTML = published.map(e => `
+        <article class="exam-card">
+          <div>
+            <h3>${esc(e.title)}</h3>
+            <p class="hint">${esc(e.code || '')} &bull; Pass score: ${e.pass_marks || 6}/${e.total_marks || 10}</p>
+          </div>
+          ${badge('Open now', 'b-ok')}
+        </article>
+      `).join('');
+    } else {
+      $('#active').innerHTML = '<div class="empty"><b>No active exams</b>Publish an exam to make it available to students.</div>';
+    }
+
+    // Latest Attempts
+    if (data.recent_attempts && data.recent_attempts.length) {
+      $('#rows').innerHTML = data.recent_attempts.map(r => `
+        <tr>
+          <td><b>${esc(r.student)}</b><br><small class="hint">${esc(r.sid)}</small></td>
+          <td>${esc((r.exam_title || '').split(':')[0])}</td>
+          <td>${fmtDateTime(r.date)}</td>
+          <td><b>${r.score}</b> / ${r.marks}</td>
+          <td>${passBadge(r.passed)}</td>
+        </tr>
+      `).join('');
+    } else {
+      $('#rows').innerHTML = '<tr><td colspan="5" class="empty"><b>No attempts recorded yet</b>Submissions will appear here in real time.</td></tr>';
+    }
+
+  } catch (err) {
+    console.error('Failed to load admin dashboard:', err);
+    $('#stats').innerHTML = `<div class="card alert bad">Failed to load admin dashboard: ${esc(err.message)}</div>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadAdminDashboard);
+</script>
+</body>
+</html>

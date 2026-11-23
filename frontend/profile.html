@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Profile and settings - ExamDesk</title><link rel="stylesheet" href="css/app.css"></head>
+<body data-role="student" data-title="Profile and settings">
+<div id="page">
+<div class="page-head"><div><h1>Profile and settings</h1><p>Keep your details current. Result emails go to the address below.</p></div></div>
+<div class="grid g2">
+<form class="card" id="pf" novalidate><div class="card-h"><h2>Personal details</h2></div><div class="card-b">
+  <div class="field"><label for="name">Full name</label><input id="name" required><span class="err"></span></div>
+  <div class="field"><label for="email">Email address</label><input id="email" type="email" required><span class="err"></span></div>
+  <div class="row"><div class="field"><label for="sid">Register number</label><input id="sid" disabled></div><div class="field"><label for="dept">Department</label><input id="dept" disabled></div></div>
+  <label class="check"><input type="checkbox" id="mail" checked><span>Email me my result after each exam</span></label>
+  <button class="btn" type="submit" id="go1">Save changes</button></div></form>
+<form class="card" id="pw" novalidate><div class="card-h"><h2>Change password</h2></div><div class="card-b">
+  <div class="field"><label for="cur">Current password</label><input id="cur" type="password" autocomplete="current-password"><span class="err"></span></div>
+  <div class="field"><label for="n1">New password</label><input id="n1" type="password" autocomplete="new-password"><span class="err"></span></div>
+  <div class="field"><label for="n2">Confirm new password</label><input id="n2" type="password" autocomplete="new-password"><span class="err"></span></div>
+  <button class="btn" type="submit" id="go2">Update password</button></div></form>
+</div><br>
+<section class="card"><div class="card-h"><h2>Demo data</h2></div><div class="card-b"><p class="hint">Phase 1 keeps exam progress in this browser. Clear it to start the sample exam again.</p><button class="btn sec" id="reset">Reset demo data</button></div></section>
+</div>
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+const role = new URLSearchParams(location.search).get('role') === 'admin' ? 'admin' : 'student';
+const currentUser = API.getUser();
+const u = currentUser || DB[role];
+$('#name').value = u.name || '';
+$('#email').value = u.email || '';
+$('#sid').value = u.registration_number || u.id || '';
+$('#dept').value = u.dept || u.department || 'Computer Science';
+
+function check(form, rules) {
+  let ok = true;
+  for (const [id, fn] of Object.entries(rules)) {
+    const r = fn($('#' + id).value), f = $('#' + id).closest('.field');
+    f.classList.toggle('invalid', r !== true);
+    $('.err', f).textContent = r === true ? '' : r;
+    if (r !== true) ok = false;
+  }
+  return ok;
+}
+
+$('#pf').addEventListener('submit', ev => {
+  ev.preventDefault();
+  if (check(0, {
+    name: v => v.trim().length >= 3 || 'Enter your full name.',
+    email: v => /^\S+@\S+\.\S+$/.test(v) || 'Enter a valid email address.'
+  })) {
+    withLoading($('#go1'), 600, () => {
+      u.name = $('#name').value.trim();
+      u.email = $('#email').value.trim();
+      API.setUser(u);
+      toast('Profile updated successfully.', 'ok');
+    });
+  }
+});
+
+$('#pw').addEventListener('submit', ev => {
+  ev.preventDefault();
+  if (check(0, {
+    cur: v => v ? true : 'Enter your current password.',
+    n1: v => (v.length >= 6) || 'Password must be at least 6 characters.',
+    n2: v => v === $('#n1').value || 'Passwords do not match.'
+  })) {
+    withLoading($('#go2'), 600, () => {
+      toast('Password updated successfully.', 'ok');
+      $('#pw').reset();
+    });
+  }
+});
+
+$('#reset').onclick = () => {
+  try {
+    API.clearAuth();
+  } catch (e) {}
+  toast('Session reset. Redirecting to login.', 'ok');
+  setTimeout(() => location.href = 'login.html', 700);
+};
+</script></body></html>

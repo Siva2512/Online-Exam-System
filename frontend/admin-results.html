@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Results management - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="admin" data-title="Results">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1>Examination Results & Reports</h1>
+      <p>Filter student attempts across examinations, then export official CSV reports.</p>
+    </div>
+    <button class="btn" id="csv">Export CSV Report</button>
+  </div>
+
+  <section class="card">
+    <div class="toolbar">
+      <select id="s" aria-label="Student">
+        <option value="">All students</option>
+      </select>
+      <select id="e" aria-label="Exam">
+        <option value="">All exams</option>
+      </select>
+      <input id="from" type="date" aria-label="Attempts from date">
+      <input id="to" type="date" aria-label="Attempts up to date">
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Register no.</th>
+            <th>Exam</th>
+            <th>Submitted</th>
+            <th>Score</th>
+            <th>Percentage</th>
+            <th>Outcome</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="7" style="text-align:center"><span class="spinner"></span> Loading results...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="empty" class="empty" hidden><b>No results for these filters</b>Widen the date range or select all students.</div>
+  </section>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+let currentResults = [];
+
+async function initAdminResults() {
+  try {
+    const [studentsRes, examsRes] = await Promise.all([
+      API.getAdminStudents().catch(() => ({ students: [] })),
+      API.getAdminExams().catch(() => ({ exams: [] }))
+    ]);
+
+    const sSelect = $('#s');
+    (studentsRes.students || []).forEach(st => {
+      const opt = document.createElement('option');
+      opt.value = st.id;
+      opt.textContent = `${st.name} (${st.id})`;
+      sSelect.appendChild(opt);
+    });
+
+    const eSelect = $('#e');
+    (examsRes.exams || []).forEach(ex => {
+      const opt = document.createElement('option');
+      opt.value = ex.id;
+      opt.textContent = `${ex.code}: ${ex.title.split(':')[0]}`;
+      eSelect.appendChild(opt);
+    });
+
+    const preStudent = new URLSearchParams(location.search).get('student');
+    if (preStudent) sSelect.value = preStudent;
+
+    loadResults();
+  } catch (err) {
+    console.error('Failed to initialize filters:', err);
+  }
+}
+
+async function loadResults() {
+  const s = $('#s').value;
+  const e = $('#e').value;
+  const from = $('#from').value;
+  const to = $('#to').value;
+
+  $('#rows').innerHTML = '<tr><td colspan="7" style="text-align:center"><span class="spinner"></span> Loading results...</td></tr>';
+
+  try {
+    const res = await API.getAdminResults({ student: s, exam: e, from, to });
+    currentResults = res.results || [];
+    draw();
+  } catch (err) {
+    console.error('Failed to load admin results:', err);
+    $('#rows').innerHTML = `<tr><td colspan="7" class="err">Failed to load results: ${esc(err.message)}</td></tr>`;
+  }
+}
+
+function draw() {
+  if (!currentResults.length) {
+    $('#rows').innerHTML = '';
+    $('#empty').hidden = false;
+    $('#csv').disabled = true;
+    return;
+  }
+
+  $('#empty').hidden = true;
+  $('#csv').disabled = false;
+
+  $('#rows').innerHTML = currentResults.map(r => `
+    <tr>
+      <td><b>${esc(r.student)}</b></td>
+      <td>${esc(r.sid)}</td>
+      <td>${esc((r.exam_title || '').split(':')[0])}</td>
+      <td>${fmtDateTime(r.date)}</td>
+      <td><b>${r.score}</b> / ${r.marks}</td>
+      <td>${r.percentage}%</td>
+      <td>${passBadge(r.passed)}</td>
+    </tr>
+  `).join('');
+}
+
+['s', 'e', 'from', 'to'].forEach(id => $('#' + id).onchange = loadResults);
+
+$('#csv').onclick = () => {
+  const s = $('#s').value;
+  const e = $('#e').value;
+  const from = $('#from').value;
+  const to = $('#to').value;
+
+  const url = API.getAdminResultsExportUrl({ student: s, exam: e, from, to });
+  window.location.href = url;
+};
+
+document.addEventListener('DOMContentLoaded', initAdminResults);
+</script>
+</body>
+</html>

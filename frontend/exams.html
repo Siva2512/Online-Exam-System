@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Available exams - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="student" data-title="Available exams">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1>Available Examination Categories</h1>
+      <p>Standardized tests configured for your cloud and networking curriculum.</p>
+    </div>
+  </div>
+  <section class="card">
+    <div class="toolbar">
+      <input id="q" type="search" placeholder="Search by title, category, or code" aria-label="Search exams">
+      <select id="st" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        <option value="available">Open now</option>
+        <option value="completed">Completed</option>
+      </select>
+    </div>
+    <div id="list" aria-live="polite">
+      <div class="empty"><span class="spinner"></span> Loading available examinations...</div>
+    </div>
+  </section>
+</div>
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+let allExams = [];
+let completedExamIds = new Set();
+
+async function initExams() {
+  try {
+    const [examsRes, resultsRes] = await Promise.all([
+      API.getExams(),
+      API.getResults().catch(() => ({ results: [] }))
+    ]);
+
+    allExams = examsRes.exams || [];
+    completedExamIds = new Set((resultsRes.results || []).map(r => r.exam_id));
+
+    allExams.forEach(e => {
+      e.is_completed = completedExamIds.has(e.id);
+    });
+
+    draw();
+  } catch (err) {
+    $('#list').innerHTML = `<div class="empty"><b>Error loading exams</b>${esc(err.message)}</div>`;
+  }
+}
+
+function draw() {
+  const q = $('#q').value.toLowerCase().trim();
+  const st = $('#st').value;
+
+  const filtered = allExams.filter(e => {
+    const matchSearch = !q || (e.title + ' ' + (e.code || '') + ' ' + (e.category || '')).toLowerCase().includes(q);
+    const matchStatus = !st || (st === 'completed' ? e.is_completed : !e.is_completed);
+    return matchSearch && matchStatus;
+  });
+
+  $('#list').innerHTML = filtered.length
+    ? filtered.map(examCard).join('')
+    : '<div class="empty"><b>No exams match your filter</b>Clear the search term or choose a different status.</div>';
+}
+
+$('#q').oninput = draw;
+$('#st').onchange = draw;
+document.addEventListener('DOMContentLoaded', initExams);
+</script>
+</body>
+</html>

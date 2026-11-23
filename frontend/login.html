@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Log in - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="public" data-title="">
+<div id="page">
+  <div class="auth-wrap">
+    <div class="card auth">
+      <div class="card-b">
+        <h1>Log in to ExamDesk</h1>
+        <p class="hint">Enter your registered email address and password.</p><br>
+        <div id="alert" class="alert bad" role="alert" hidden></div>
+        <form id="f" novalidate>
+          <div class="field">
+            <label for="email">Email address</label>
+            <input id="email" type="email" autocomplete="username" placeholder="student@college.edu" required>
+            <span class="err" id="e-email"></span>
+          </div>
+          <div class="field">
+            <label for="pw">Password</label>
+            <input id="pw" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            <span class="err" id="e-pw"></span>
+          </div>
+          <button class="btn block" id="go" type="submit">Log in</button>
+        </form>
+        <p class="center hint" style="margin:16px 0 0">New student? <a href="register.html">Create an account</a></p>
+        <div class="demo">
+          <b>Pre-seeded Demo Accounts:</b><br>
+          Student: <code style="cursor:pointer" onclick="$('#email').value='ananya@college.edu';$('#pw').value='Student@123'">ananya@college.edu / Student@123</code><br>
+          Admin: <code style="cursor:pointer" onclick="$('#email').value='admin@college.edu';$('#pw').value='Admin@123'">admin@college.edu / Admin@123</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+$('#f').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const alertEl = $('#alert');
+  alertEl.hidden = true;
+
+  const email = $('#email').value.trim().toLowerCase();
+  const pw = $('#pw').value;
+
+  $('#e-email').textContent = email ? (/^\S+@\S+\.\S+$/.test(email) ? '' : 'Enter a valid email address.') : 'Enter your email address.';
+  $('#e-pw').textContent = pw ? '' : 'Enter your password.';
+  if ($('#e-email').textContent || $('#e-pw').textContent) return;
+
+  const btn = $('#go');
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Logging in...';
+
+  try {
+    const res = await API.login(email, pw);
+    if (res.success) {
+      toast('Login successful! Redirecting...', 'ok');
+      setTimeout(() => {
+        location.href = res.user.role === 'admin' ? 'admin-dashboard.html' : 'student-dashboard.html';
+      }, 400);
+    }
+  } catch (err) {
+    alertEl.hidden = false;
+    alertEl.textContent = err.message || 'The email or password is incorrect. Check both and try again.';
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
+  }
+});
+</script>
+</body>
+</html>

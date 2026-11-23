@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Student Dashboard - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="student" data-title="Dashboard">
+<div id="page">
+  <div class="page-head">
+    <div>
+      <h1 id="hello">Welcome back</h1>
+      <p>Here are your available examination categories and recent performance records.</p>
+    </div>
+    <a class="btn" href="exams.html">Browse all exams</a>
+  </div>
+
+  <div class="grid g4 mb" id="stats">
+    <div class="card stat"><b>--</b><span>Available Exams</span></div>
+    <div class="card stat"><b>--</b><span>Completed Tests</span></div>
+    <div class="card stat"><b>--</b><span>Average Score</span></div>
+    <div class="card stat"><b>--</b><span>Target Category</span></div>
+  </div>
+
+  <div class="mb">
+    <div class="card-h" style="padding: 12px 0 16px; border-bottom: none">
+      <h2>Available Examination Categories</h2>
+    </div>
+    <div class="grid g2" id="examCards">
+      <div class="card"><div class="empty"><span class="spinner"></span> Loading exams...</div></div>
+    </div>
+  </div>
+
+  <br>
+
+  <section class="card">
+    <div class="card-h">
+      <h2>Recent Exam Attempts & Results</h2>
+      <a href="history.html">Full History</a>
+    </div>
+    <div class="tbl-wrap">
+      <table id="resultsTable">
+        <thead>
+          <tr>
+            <th>Exam Title</th>
+            <th>Category</th>
+            <th>Date</th>
+            <th>Score</th>
+            <th>Percentage</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="recent"></tbody>
+      </table>
+    </div>
+    <div id="emptyResults" class="empty" hidden>
+      <b>You haven't taken any tests yet.</b>
+      Choose an examination above and click "Start exam" to begin your first test.
+    </div>
+  </section>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+async function loadDashboard() {
+  const user = API.getUser();
+  if (user && user.name) {
+    $('#hello').textContent = `Welcome back, ${user.name}`;
+  }
+
+  try {
+    const data = await API.getStats();
+    const stats = data.stats;
+    const exams = stats.exams || [];
+    const attempts = stats.recent_attempts || [];
+
+    // Render Stats
+    $('#stats').innerHTML = [
+      [exams.length, 'Available Exams'],
+      [stats.completed_exams, 'Completed Tests'],
+      [stats.completed_exams > 0 ? stats.average_score + '%' : '0%', 'Average Score'],
+      ['Cloud & Net', 'Target Category']
+    ].map(([val, lbl]) => `<div class="card stat"><b>${val}</b><span>${lbl}</span></div>`).join('');
+
+    // Render Exam Cards
+    if (exams.length) {
+      $('#examCards').innerHTML = exams.map(examCard).join('');
+    } else {
+      $('#examCards').innerHTML = `<div class="card empty"><b>No active exams</b>Check back later for new examinations.</div>`;
+    }
+
+    // Render Recent Results (isolated strictly to this student)
+    if (attempts.length === 0) {
+      $('#resultsTable').hidden = true;
+      $('#emptyResults').hidden = false;
+    } else {
+      $('#resultsTable').hidden = false;
+      $('#emptyResults').hidden = true;
+      $('#recent').innerHTML = attempts.map(a => {
+        const outcome = passBadge(a.passed);
+        return `<tr>
+          <td><b>${esc(a.exam_title || a.exam_id)}</b><br><small class="hint">${esc(a.exam_code || '')}</small></td>
+          <td><span class="badge b-info">${esc(a.exam_category || 'General')}</span></td>
+          <td>${fmtDateTime(a.submitted_at)}</td>
+          <td><b>${a.score}</b> / ${a.total_marks || a.total_questions}</td>
+          <td>${a.percentage}%</td>
+          <td>${outcome}</td>
+          <td><a class="btn sm sec" href="result.html?id=${a.exam_id}">View Result</a></td>
+        </tr>`;
+      }).join('');
+    }
+  } catch (err) {
+    console.error('Dashboard load failed:', err);
+    $('#emptyResults').hidden = false;
+    $('#emptyResults').innerHTML = `<b>Could not connect to examination server</b>Make sure the backend is running.`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+</body>
+</html>

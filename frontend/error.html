@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Something went wrong - ExamDesk</title><link rel="stylesheet" href="css/app.css"></head>
+<body data-role="public" data-title="">
+<div id="page"><div class="auth-wrap"><div class="card auth"><div class="card-b center">
+  <p class="big-score">500</p><h1>Something went wrong on our side</h1>
+  <p class="hint" style="margin:8px 0 20px">Your saved answers are safe. Try again in a minute. If it keeps happening, contact the examination cell and quote the time shown below.</p>
+  <p class="hint" id="t"></p>
+  <a class="btn" href="javascript:location.reload()">Try again</a> <a class="btn sec" href="index.html">Back to home</a>
+</div></div></div></div>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>$("#t").textContent = new Date().toLocaleString("en-IN");</script></body></html>

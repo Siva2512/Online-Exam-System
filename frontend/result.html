@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Exam Result - ExamDesk</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body data-role="student" data-title="Exam Result">
+<div id="page">
+  <div id="body">
+    <div class="card"><div class="empty"><span class="spinner"></span> Loading examination result...</div></div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/mock-data.js"></script>
+<script src="js/common.js"></script>
+<script>
+async function loadResult() {
+  const params = new URLSearchParams(location.search);
+  const examIdParam = params.get('id');
+  const attemptIdParam = params.get('attempt_id');
+
+  try {
+    let att = null;
+
+    // Check if we have an attempt_id or examId
+    if (attemptIdParam) {
+      const res = await API.getResult(attemptIdParam).catch(() => null);
+      if (res && res.result) att = res.result;
+    }
+
+    if (!att && examIdParam) {
+      const res = await API.getResultByExam(examIdParam).catch(() => null);
+      if (res && res.result) att = res.result;
+    }
+
+    // If no specific exam queried, get the most recent attempt
+    if (!att && !examIdParam && !attemptIdParam) {
+      const res = await API.getResults().catch(() => null);
+      if (res && res.results && res.results.length > 0) {
+        // Load full details for the latest attempt
+        const latest = res.results[0];
+        const detailRes = await API.getResult(latest.id).catch(() => null);
+        if (detailRes && detailRes.result) att = detailRes.result;
+        else att = latest;
+      }
+    }
+
+    // If still null, check localStorage last_result if it matches the requested exam
+    if (!att) {
+      try {
+        const last = JSON.parse(localStorage.getItem('last_result') || 'null');
+        if (last && (!examIdParam || last.exam_id === examIdParam)) {
+          att = last;
+        }
+      } catch (e) {}
+    }
+
+    // REQUIREMENT 4: When a new user registers without taking any test, display empty state
+    if (!att) {
+      const examName = examIdParam ? (examIdParam === 'aws-basics' ? 'AWS Basics Test' : 'Networking Basics Test') : 'any tests';
+      $('#body').innerHTML = `
+        <div class="card">
+          <div class="empty">
+            <b>No results available yet</b>
+            You haven't taken ${esc(examName)} yet. Complete an exam to view your score report.<br><br>
+            <a class="btn" href="${examIdParam ? `exam-instructions.html?id=${examIdParam}` : 'exams.html'}">
+              ${examIdParam ? 'Take this exam' : 'Browse available exams'}
+            </a>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // Render detailed result report
+    const title = att.exam_title || (att.exam_id === 'aws-basics' ? 'AWS Basics Certification Practice Test' : 'Computer Networking Fundamentals Test');
+    const totalMarks = att.total_marks || att.total_questions || 10;
+    const passMarks = att.pass_marks || 6;
+    const score = att.score;
+    const percentage = att.percentage !== undefined ? att.percentage : pct(score, totalMarks);
+    const passed = att.passed !== undefined ? att.passed : (score >= passMarks);
+    const dateFormatted = fmtDateTime(att.submitted_at || att.date || Date.now());
+
+    let reviewSection = '';
+    if (att.review && att.review.length > 0) {
+      const rows = att.review.map(r => {
+        const userAns = r.user_choice_text ? esc(r.user_choice_text) : (r.user_choice !== null && r.user_choice !== undefined ? `Option ${String.fromCharCode(65 + r.user_choice)}` : '<span class="hint">Not answered</span>');
+        const correctAns = r.correct_option_text ? esc(r.correct_option_text) : (r.correct_option !== null && r.correct_option !== undefined ? `Option ${String.fromCharCode(65 + r.correct_option)}` : '-');
+        const statusBadge = r.is_blank ? badge('Skipped', 'b-gray') : r.is_correct ? badge('Correct', 'b-ok') : badge('Incorrect', 'b-bad');
+
+        return `<tr>
+          <td>${r.number}</td>
+          <td class="wrap"><b>${esc(r.question)}</b>${r.explanation ? `<br><small class="hint">${esc(r.explanation)}</small>` : ''}</td>
+          <td>${userAns}</td>
+          <td>${correctAns}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
+      }).join('');
+
+      reviewSection = `
+        <div class="grid g4 mb">
+          <div class="card stat"><b>${att.correct_count !== undefined ? att.correct_count : score}</b><span>Correct Answers</span></div>
+          <div class="card stat"><b>${att.incorrect_count !== undefined ? att.incorrect_count : (totalMarks - score)}</b><span>Incorrect Answers</span></div>
+          <div class="card stat"><b>${att.blank_count || 0}</b><span>Skipped</span></div>
+          <div class="card stat"><b>${att.time_taken || 1} min</b><span>Time Taken</span></div>
+        </div>
+        <section class="card">
+          <div class="card-h"><h2>Question-by-Question Review</h2></div>
+          <div class="tbl-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Question & Explanation</th>
+                  <th>Your Answer</th>
+                  <th>Correct Answer</th>
+                  <th>Outcome</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    $('#body').innerHTML = `
+      <div class="page-head">
+        <div>
+          <h1>${esc(title)}</h1>
+          <p>Completed on ${dateFormatted} &bull; Official Student Submission Record</p>
+        </div>
+        <div style="display:flex;gap:10px">
+          <a class="btn sec" href="history.html">Full History</a>
+          <a class="btn" href="exams.html">Back to Exams</a>
+        </div>
+      </div>
+
+      <section class="card mb">
+        <div class="card-b grid g2" style="align-items:center">
+          <div>
+            <div class="big-score">${score} <span class="hint" style="font-size:1.1rem">/ ${totalMarks} Marks</span></div>
+            <p class="hint" style="margin:6px 0 0">${percentage}% &bull; Pass score requirement: ${passMarks} / ${totalMarks}</p>
+          </div>
+          <div>
+            ${passBadge(passed)}
+            <div class="progress" style="margin-top:14px" role="img" aria-label="${percentage} percent">
+              <i style="width:${percentage}%; background:${passed ? 'var(--ok)' : 'var(--bad)'}"></i>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      ${reviewSection}
+    `;
+
+  } catch (err) {
+    console.error('Error loading result:', err);
+    $('#body').innerHTML = `
+      <div class="card">
+        <div class="empty">
+          <b>Unable to load examination result</b>
+          ${esc(err.message)}<br><br>
+          <a class="btn" href="exams.html">Return to Exams</a>
+        </div>
+      </div>
+    `;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadResult);
+</script>
+</body>
+</html>
